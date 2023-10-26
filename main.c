@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define MAX_OBRAS 100
 #define MAX_INGRESSOS 100
+#define MAX_PERGUNTAS 6
 
 struct ObraDeArte {
     int codigo;
@@ -13,9 +15,10 @@ struct ObraDeArte {
 };
 
 struct Ingresso {
-    int codigoObra; // Código da obra associada ao ingresso
-    int tipo; // 0: Inteira, 1: Meia-entrada, 2: Isenção
-    int valido; // 1 se válido, 0 se inválido
+    int codigoObra;
+    int tipo;
+    int valido;
+    char token[20];
 };
 
 struct Tema {
@@ -29,41 +32,114 @@ struct Museu {
     int totalIngressos;
 };
 
-void listarObras(struct Museu museu, int tema) {
-    printf("Lista de Obras de Arte no Museu:\n");
-    for (int i = 0; i < museu.temas[tema].totalObras; i++) {
-        printf("Código: %d\n", museu.temas[tema].obras[i].codigo);
-        printf("Título: %s\n", museu.temas[tema].obras[i].titulo);
-        printf("Artista: %s\n", museu.temas[tema].obras[i].artista);
-        printf("Descrição: %s\n", museu.temas[tema].obras[i].descricao);
-        printf("Ano: %s\n", museu.temas[tema].obras[i].ano);
+struct Pesquisa {
+    char pergunta[MAX_PERGUNTAS][100];
+    char resposta[MAX_PERGUNTAS][100];
+};
+
+void listarObrasDoTema(struct Museu *museu, int tema) {
+    printf("Lista de Obras de Arte no Museu (Tema %d):\n", tema);
+    for (int i = 0; i < museu->temas[tema].totalObras; i++) {
+        printf("Código: %d\n", museu->temas[tema].obras[i].codigo);
+        printf("Título: %s\n", museu->temas[tema].obras[i].titulo);
+        printf("Artista: %s\n", museu->temas[tema].obras[i].artista);
+        printf("Descrição: %s\n", museu->temas[tema].obras[i].descricao);
+        printf("Ano: %s\n", museu->temas[tema].obras[i].ano);
         printf("\n");
     }
 }
 
-void venderIngresso(struct Museu *museu, int codigoObra, int tipo) {
-    if (museu->totalIngressos < MAX_INGRESSOS) {
-        museu->ingressos[museu->totalIngressos].codigoObra = codigoObra;
-        museu->ingressos[museu->totalIngressos].tipo = tipo;
-        museu->ingressos[museu->totalIngressos].valido = 1;
-        museu->totalIngressos++;
-        printf("Ingresso vendido com sucesso.\n");
-    } else {
-        printf("O museu atingiu o limite de ingressos vendidos.\n");
+
+void listarObras(struct Museu *museu, int tema, const struct Ingresso ingressos[], int totalIngressos) {
+    printf("Lista de Obras de Arte no Museu (Tema %d):\n", tema);
+    for (int i = 0; i < museu->temas[tema].totalObras; i++) {
+        printf("Código: %d\n", museu->temas[tema].obras[i].codigo);
+        printf("Título: %s\n", museu->temas[tema].obras[i].titulo);
+        printf("Artista: %s\n", museu->temas[tema].obras[i].artista);
+        printf("Descrição: %s\n", museu->temas[tema].obras[i].descricao);
+        printf("Ano: %s\n", museu->temas[tema].obras[i].ano);
+        printf("\n");
     }
 }
 
-void entrarNaObra(struct Museu *museu, int codigoObra, int tipo) {
-    for (int i = 0; i < museu->totalIngressos; i++) {
-        if (museu->ingressos[i].codigoObra == codigoObra && museu->ingressos[i].tipo == tipo && museu->ingressos[i].valido) {
-            printf("Acesso concedido à obra.\n");
-            museu->ingressos[i].valido = 0; // Marca o ingresso como inválido após o acesso
-            return;
+
+void gerarToken(char *token) {
+    sprintf(token, "%06d", rand() % 1000000);
+}
+
+void venderIngresso(struct Museu *museu, int codigoObra, int tipo) {
+    float precoInteira = 20.0;
+    float precoMeia = 10.0;
+    float precoIsencao = 0.0;
+
+    float precoTotal = 0.0;
+
+    if (tipo == 0) {
+        precoTotal = precoInteira;
+    } else if (tipo == 1) {
+        precoTotal = precoMeia;
+    } else if (tipo == 2) {
+        precoTotal = precoIsencao;
+    } else {
+        printf("Tipo de ingresso inválido.\n");
+        return;
+    }
+
+    printf("Total a pagar: R$ %.2f\n", precoTotal);
+
+    float pagamento;
+    printf("Digite o valor do pagamento: ");
+    scanf("%f", &pagamento);
+
+    if (pagamento < precoTotal) {
+        printf("Pagamento insuficiente. Ingresso não vendido.\n");
+    } else {
+        if (museu->totalIngressos < MAX_INGRESSOS) {
+            char token[20];
+            gerarToken(token);
+
+            museu->ingressos[museu->totalIngressos].codigoObra = codigoObra;
+            museu->ingressos[museu->totalIngressos].tipo = tipo;
+            strncpy(museu->ingressos[museu->totalIngressos].token, token, sizeof(museu->ingressos[museu->totalIngressos].token));
+
+            museu->ingressos[museu->totalIngressos].valido = 1;
+
+            museu->totalIngressos++;
+            printf("Ingresso vendido com sucesso. Seu token: %s\n", token);
+
+            float troco = pagamento - precoTotal;
+            if (troco > 0) {
+                printf("Troco: R$ %.2f\n", troco);
+            }
+        } else {
+            printf("O museu atingiu o limite de ingressos vendidos.\n");
         }
     }
-    printf("Acesso negado. Verifique seu ingresso.\n");
 }
-void adicionarObra(struct Museu *museu, int tema, int codigo, char titulo[100], char artista[100], char descricao[500], char ano[12]) {
+
+void entrarNaObra(struct Museu *museu, int codigoObra, int tipo, const char *token, int *acessouObra) {
+    int temaDaObra = -1;
+    int i;
+
+    for (i = 0; i < museu->totalIngressos; i++) {
+        if (museu->ingressos[i].codigoObra == codigoObra && museu->ingressos[i].tipo == tipo &&
+            museu->ingressos[i].valido && strcmp(museu->ingressos[i].token, token) == 0) {
+            temaDaObra = codigoObra;
+            break;
+        }
+    }
+
+    if (temaDaObra != -1) {
+        printf("Acesso concedido ao tema %d:\n", temaDaObra);
+        listarObrasDoTema(museu, temaDaObra);
+        museu->ingressos[i].valido = 0;
+        *acessouObra = 1;
+    } else {
+        printf("Acesso negado. Verifique seu ingresso ou token.\n");
+    }
+}
+
+void adicionarObra(struct Museu *museu, int tema, int codigo, const char titulo[100], const char artista[100], const char descricao[500], const char ano[12]) {
     if (museu->temas[tema].totalObras < MAX_OBRAS) {
         museu->temas[tema].obras[museu->temas[tema].totalObras].codigo = codigo;
         strncpy(museu->temas[tema].obras[museu->temas[tema].totalObras].titulo, titulo, sizeof(museu->temas[tema].obras[museu->temas[tema].totalObras].titulo));
@@ -78,7 +154,20 @@ void adicionarObra(struct Museu *museu, int tema, int codigo, char titulo[100], 
     }
 }
 
+void fazerPesquisa(struct Pesquisa *pesquisa) {
+    printf("Responda às seguintes perguntas:\n");
+
+    for (int i = 0; i < MAX_PERGUNTAS; i++) {
+        printf("Pergunta %d: %s\n", i + 1, pesquisa->pergunta[i]);
+        printf("Sua resposta: ");
+        scanf("%s", pesquisa->resposta[i]);
+    }
+    printf("Obrigado por responder às perguntas!\n");
+}
+
 int main() {
+    int respondeuPesquisa = 0;
+    int acessouObra = 0;
     struct Museu museu;
     for (int i = 0; i < 4; i++) {
         museu.temas[i].totalObras = 0;
@@ -96,9 +185,17 @@ int main() {
     adicionarObra(&museu, 2, 2, "Sustentabilidade nos Jogos Olímpicos de Paris 2024", "Paris 2024", " Este tema aborda os esforços de Paris 2024 para tornar os Jogos mais sustentáveis, com foco em questões ambientais, econômicas e sociais. Você pode discutir as iniciativas de sustentabilidade, como o uso de energias renováveis, transporte público eficiente e iniciativas de reciclagem.", "2024");
     adicionarObra(&museu, 2, 3, "Legado dos Jogos Olímpicos de Paris 2024", "Paris 2024", "Explore como os Jogos Olímpicos de Paris 2024 podem deixar um legado duradouro para a cidade, o país e o movimento olímpico global. Discuta como as Olimpíadas podem impactar o turismo, o esporte, a cultura e a economia de Paris e da França no longo prazo.", "2024");
 
-
     int opcao;
     int temaSelecionado = 0;
+    char token[20];
+
+    struct Pesquisa pesquisa;
+    strcpy(pesquisa.pergunta[0], "Qual o seu nome?");
+    strcpy(pesquisa.pergunta[1], "Qual o seu sexo?");
+    strcpy(pesquisa.pergunta[2], "Qual sua idade?");
+    strcpy(pesquisa.pergunta[3], "De 0 a 10, o quanto você gostou das obras?");
+    strcpy(pesquisa.pergunta[4], "De 0 a 10, o quanto você recomendaria o nosso museu a um amigo?");
+    strcpy(pesquisa.pergunta[5], "Você visitaria o museu novamente?");
 
     do {
         printf("Museu de Arte\n");
@@ -117,40 +214,58 @@ int main() {
                 printf("1. Listar obras\n");
                 printf("2. Comprar ingresso\n");
                 printf("3. Acessar obra\n");
-                printf("4. Voltar ao menu principal\n");
+                printf("4. Responder à pesquisa (depois de acessar uma obra)\n");
+                printf("5. Voltar ao menu principal\n");
                 printf("Escolha uma opção: ");
                 scanf("%d", &opcao);
 
                 switch (opcao) {
                     case 1:
-                        listarObras(museu, temaSelecionado);
+                        listarObras(&museu, temaSelecionado, museu.ingressos, museu.totalIngressos);
                         break;
                     case 2:
-                        int codigoObra, tipo;
-                        printf("Digite o código da obra que deseja comprar ingresso: ");
+                        int codigoObra;
+                        int tipo;
+                        printf("Digite o código da obra: ");
                         scanf("%d", &codigoObra);
-                        printf("Escolha o tipo de ingresso (0: Inteira, 1: Meia-entrada, 2: Isenção): ");
+                        printf("Escolha o tipo de ingresso:\n");
+                        printf("0. Inteira (R$20.00)\n");
+                        printf("1. Meia (R$10.00)\n");
+                        printf("2. Isenção (gratuito)\n");
+                        printf("Escolha o tipo de ingresso: ");
                         scanf("%d", &tipo);
                         venderIngresso(&museu, codigoObra, tipo);
+                        acessouObra = 1;
                         break;
                     case 3:
-                        int codigoObraAcesso, tipoAcesso;
-                        printf("Digite o código da obra que deseja acessar: ");
-                        scanf("%d", &codigoObraAcesso);
-                        printf("Escolha o tipo de ingresso (0: Inteira, 1: Meia-entrada, 2: Isenção): ");
-                        scanf("%d", &tipoAcesso);
-                        entrarNaObra(&museu, codigoObraAcesso, tipoAcesso);
+                        if (acessouObra) {
+                            printf("Digite o código da obra: ");
+                            scanf("%d", &codigoObra);
+                            printf("Digite o tipo de ingresso: ");
+                            scanf("%d", &tipo);
+                            printf("Digite o token: ");
+                            scanf("%s", token);
+                            entrarNaObra(&museu, codigoObra, tipo, token, &acessouObra);
+                        } else {
+                            printf("Por favor, acesse uma obra antes de responder à pesquisa.\n");
+                        }
                         break;
                     case 4:
+                        if (acessouObra) {
+                            fazerPesquisa(&pesquisa);
+                            respondeuPesquisa = 1;
+                        } else {
+                            printf("Por favor, acesse uma obra antes de responder à pesquisa.\n");
+                        }
+                        break;
+                    case 5:
                         break;
                     default:
                         printf("Opção inválida.\n");
                 }
-            } while (opcao != 4);
-        } else if (temaSelecionado == 4) {
-            printf("Encerrando o programa.\n");
-        } else {
-            printf("Tema inválido. Escolha um tema válido.\n");
+            } while (opcao != 5);
+        } else if (temaSelecionado != 4) {
+            printf("Tema inválido. Escolha um tema válido ou saia.\n");
         }
     } while (temaSelecionado != 4);
 
